@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Cidade Esponja — Painel Simples</title>
+  <style>
+    :root{--bg:#f4f7fb;--card:#ffffff;--accent:#0f62fe;--muted:#6b7280}
+    body{font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; margin:0;background:var(--bg);color:#0b1220}
+    header{background:linear-gradient(90deg,#0f62fe22,transparent);padding:14px 20px;display:flex;align-items:center;gap:12px}
+    .brand{font-weight:700;color:var(--accent)}
+    .search-bar{margin-left:auto;display:flex;gap:8px;align-items:center}
+    .search-bar input[type=text]{padding:8px 10px;border-radius:8px;border:1px solid #d1d5db;background:white}
+    .btn{padding:8px 12px;border-radius:8px;border:0;background:var(--accent);color:white;cursor:pointer}
+    .container{max-width:980px;margin:22px auto;padding:0 16px}
+    .grid{display:grid;grid-template-columns:1fr 360px;gap:18px}
+    .card{background:var(--card);padding:16px;border-radius:12px;box-shadow:0 6px 18px rgba(11,18,32,0.06)}
+    h2{margin:0 0 10px 0;font-size:18px}
+    p.small{color:var(--muted);margin:0 0 12px 0}
+    .stat{display:flex;justify-content:space-between;align-items:center;margin:8px 0}
+    .risk{font-weight:700}
+    .chart-wrap{height:180px}
+    .list-saved{margin-top:12px}
+    footer{max-width:980px;margin:18px auto;color:var(--muted);font-size:13px}
+    label{display:block;font-size:13px;margin-bottom:6px}
+    .input{width:100%;padding:8px;border-radius:8px;border:1px solid #e6e9ef}
+  </style>
+  <!-- Chart.js (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <header>
+    <div class="brand">Cidade Esponja</div>
+    <div class="search-bar">
+      <input id="cityInput" type="text" placeholder="Digite sua cidade (ex: São Paulo)" />
+      <button id="searchBtn" class="btn">Pesquisar</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="grid">
+      <section class="card">
+        <h2>O que é uma Cidade Esponja?</h2>
+        <p class="small">Cidade Esponja é um conjunto de estratégias urbanas que aumentam a capacidade da cidade de absorver, armazenar e reutilizar a água da chuva — reduzindo enchentes, recarregando aquíferos e melhorando a resiliência urbana.</p>
+
+        <h2>Resumo rápido</h2>
+        <div class="stat"><span>Índice de chuva (média anual)</span><strong id="rainIndex">— mm</strong></div>
+        <div class="stat"><span>Chance estimada de alagamento</span><span id="floodChance" class="risk">—</span></div>
+        <div class="chart-wrap card" style="margin-top:12px;padding:10px">
+          <canvas id="percentChart" height="160"></canvas>
+        </div>
+
+        <h2 style="margin-top:14px">Sobre a simulação</h2>
+        <p class="small">Este site é uma demonstração simples: ao pesquisar uma cidade, o painel mostra valores de exemplo (baseados em dados hipotéticos) para índice de chuva e chance de alagamento. Para informações oficiais, consulte órgãos municipais ou serviços meteorológicos.</p>
+
+        <div style="margin-top:12px">
+          <label for="registerCity">Cadastrar cidade (salva no navegador)</label>
+          <div style="display:flex;gap:8px"><input id="registerCity" class="input" placeholder="Nome da cidade" /><button id="saveCity" class="btn">Cadastrar</button></div>
+          <div class="list-saved" id="savedList"></div>
+        </div>
+      </section>
+
+      <aside class="card">
+        <h2>Pesquisar sua cidade</h2>
+        <p class="small">Digite o nome de uma cidade e clique em <strong>Pesquisar</strong> para ver uma estimativa rápida.</p>
+        <label for="cityInputSide">Cidade</label>
+        <input id="cityInputSide" type="text" class="input" placeholder="Ex: Rio de Janeiro" />
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button id="searchBtnSide" class="btn">Pesquisar</button>
+          <button id="useExample" class="btn" style="background:#10b981">Exemplos</button>
+        </div>
+        <hr style="margin:12px 0" />
+        <h2>Indicadores adicionais</h2>
+        <div class="small">Terreno impermeável: <strong id="impermeable">—</strong></div>
+        <div class="small">Sistema de drenagem: <strong id="drainage">—</strong></div>
+        <div class="small">Recomendação: <strong id="advice">—</strong></div>
+      </aside>
+    </div>
+  </main>
+
+  <footer>
+    Demonstração — dados ilustrativos. Desenvolvido para fins educacionais.
+  </footer>
+
+  <script>
+    // Dados de exemplo para algumas cidades (valores fictícios)
+    const sampleData = {
+      "São Paulo": {rain: 1450, impermeable: "Alto", drainage: "Parcial", advice: "Aumentar áreas permeáveis e bacias de retenção."},
+      "Rio de Janeiro": {rain: 1200, impermeable: "Médio", drainage: "Bom", advice: "Manutenção de galerias pluviais e restauração de manguezais."},
+      "Salvador": {rain: 1100, impermeable: "Médio-Alto", drainage: "Parcial", advice: "Incentivar infraestrutura verde e renaturalização."},
+      "Belo Horizonte": {rain: 1000, impermeable: "Alto", drainage: "Fraco", advice: "Investir em reservatórios urbanos e permeabilização."}
+    };
+
+    // Inicializa valores padrões
+    let chart;
+    function initChart() {
+      const ctx = document.getElementById('percentChart');
+      chart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: ['Absorção (verde)', 'Alocação (azul)', 'Risco (vermelho)'],
+          datasets: [{data: [40, 35, 25],
+            backgroundColor: ['#10b981', '#0f62fe', '#ef4444']
+          }]
+        },
+        options: {responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom'}}}
+      });
+    }
+
+    function updateDashboard(city, values){
+      document.getElementById('rainIndex').textContent = values.rain + ' mm/ano';
+      const flood = estimateFloodChance(values.rain, values.impermeable);
+      document.getElementById('floodChance').textContent = flood + '%';
+      document.getElementById('impermeable').textContent = values.impermeable;
+      document.getElementById('drainage').textContent = values.drainage || 'Desconhecido';
+      document.getElementById('advice').textContent = values.advice || 'Ações locais recomendadas.';
+
+      // Atualiza gráfico: transformamos em porcentagens ilustrativas
+      const absorb = Math.max(5, Math.round(60 - (values.rain/30)));
+      const allocation = Math.max(5, Math.round(30 - (values.rain/80)));
+      const risk = Math.max(5, 100 - (absorb + allocation));
+      chart.data.datasets[0].data = [absorb, allocation, risk];
+      chart.update();
+    }
+
+    function estimateFloodChance(rain, impermeable){
+      // regra simples ilustrativa
+      let base = Math.round((rain - 800) / 8); // mais chuva -> maior base
+      if(impermeable.toLowerCase().includes('alto')) base += 15;
+      if(impermeable.toLowerCase().includes('médio')) base += 8;
+      if(impermeable.toLowerCase().includes('fraco')) base += 25;
+      base = Math.min(95, Math.max(3, base));
+      return base;
+    }
+
+    // Interação: pesquisar
+    document.getElementById('searchBtn').addEventListener('click', ()=> doSearch(document.getElementById('cityInput').value));
+    document.getElementById('searchBtnSide').addEventListener('click', ()=> doSearch(document.getElementById('cityInputSide').value));
+    document.getElementById('useExample').addEventListener('click', ()=> showExamples());
+
+    function doSearch(q){
+      const city = (q || '').trim();
+      if(!city) return alert('Por favor digite o nome da cidade.');
+      const data = sampleData[city] || {rain: Math.round(800 + Math.random()*900), impermeable: ['Baixo','Médio','Alto'][Math.floor(Math.random()*3)], drainage: ['Bom','Parcial','Fraco'][Math.floor(Math.random()*3)], advice: 'Verificar planos locais e históricos de enchentes.'};
+      updateDashboard(city, data);
+    }
+
+    // Cadastrar cidade (salva no localStorage)
+    function refreshSaved(){
+      const saved = JSON.parse(localStorage.getItem('savedCities') || '[]');
+      const div = document.getElementById('savedList');
+      div.innerHTML = '<strong>Cidades cadastradas:</strong>' + (saved.length ? '<ul>' + saved.map(s=>`<li>${s}</li>`).join('') + '</ul>' : '<div class="small">Nenhuma cadastrada.</div>');
+    }
+    document.getElementById('saveCity').addEventListener('click', ()=>{
+      const name = document.getElementById('registerCity').value.trim();
+      if(!name) return alert('Digite o nome da cidade para cadastrar.');
+      const arr = JSON.parse(localStorage.getItem('savedCities') || '[]');
+      if(!arr.includes(name)) arr.push(name);
+      localStorage.setItem('savedCities', JSON.stringify(arr));
+      refreshSaved();
+      alert('Cidade cadastrada localmente: ' + name);
+    });
+
+    function showExamples(){
+      const keys = Object.keys(sampleData);
+      const choice = keys[Math.floor(Math.random()*keys.length)];
+      document.getElementById('cityInput').value = choice;
+      document.getElementById('cityInputSide').value = choice;
+      doSearch(choice);
+    }
+
+    // Inicialização
+    initChart();
+    refreshSaved();
+    // exibe um exemplo inicial
+    showExamples();
+  </script>
+</body>
+</html>
